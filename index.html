@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>HIV Living Cases by Race/Ethnicity</title>
+		<script type="text/javascript" src="http://d3js.org/d3.v3.js"></script>
+		<style type="text/css">
+			
+			body {background-color: grey; color: lightgrey; font-family: sans-serif; padding: 1em;}
+			svg {background: darkgrey;}
+			svg rect {fill: lightgrey;
+					-moz-transition-property: all;
+				    -o-transition-property: all;
+				    -webkit-transition-property: all;
+				    transition-property: all;
+				    -moz-transition-duration: 0.2s;
+				    -o-transition-duration: 0.2s;
+				    -webkit-transition-duration: 0.2s;
+				    transition-duration: 0.2s;
+				    -moz-transition-timing-function: ease;
+				    -o-transition-timing-function: ease;
+				    -webkit-transition-timing-function: ease;
+				    transition-timing-function: ease;
+
+			}
+			svg rect:hover {fill: grey;}
+			.axis path,
+			.axis line {
+				fill: none;
+				stroke: grey;
+				shape-rendering: crispEdges;
+			}
+			
+			.axis text {
+				font-family: sans-serif;
+				font-size: 11px;
+				stroke: grey;
+			}
+			/*.y.axis path, .y.axis line {opacity: 0}*/
+			p {color: darkgrey}
+			a {color: darkgrey;}
+
+		</style>
+	</head>
+	<body>
+	<h1>2012 California HIV Living Cases by Race/Ethnicity</h1>
+	<p>Source: <a href="http://www.healthdata.gov/dataset/hivaids-living-cases-2012">Healthdata.gov</p>
+	<script type="text/javascript">	
+
+			var dataset = [];
+			var subset = [];
+			var headers = [];
+
+			var w = 1000;
+			var h = 536;
+			var padding = [ 20, 20, 40, 200 ];  //Top, right, bottom, left
+
+			var svg = d3.select("body")
+				.append("svg")
+				.attr("width", w)
+				.attr("height", h);
+
+
+			//DOMAIN IS DATA value
+			//RANGE IS PIXEL VALUE
+			var widthScale = d3.scale.linear()
+				//.domain([ 0, 21000 ]) - Set domain dynamically below based on data
+				.range([ 0, w - padding[1] - padding[3] ]);
+
+			//Set height of scale based on height of svg, set the height of the range coponents dynamically below
+			var heightScale = d3.scale.ordinal()
+								//.rangeBands([ 0, h ]);
+								.rangeRoundBands([ padding[0], h - padding[2] ], 0.1); //use this function for rounding to nearest pixel and setting % space between compnents
+
+			var xAxis = d3.svg.axis()
+							.scale(widthScale)
+							.orient("bottom");
+
+			var yAxis = d3.svg.axis()
+							.scale(heightScale)
+							.orient("left");
+
+			function convertColumns(data) {
+			// Loop through once for each row in the data set
+				for (var i = 0; i < data.length; i++) {
+					
+					// If this category matches what we want to extract…
+					if (data[i].DemographicCategory == "RaceEthnicity") {
+
+						// …then save just the values (columns) we care about
+						// by appending a new object to the subset array
+						subset.push({
+							"DemographicCategory": data[i].DemographicCategory,
+							"DemographicType": data[i].DemographicType,
+							"HIVCount": data[i].HIVCount
+						});
+
+					}
+				}
+				return subset;
+			}
+
+
+
+			
+
+
+			d3.csv("hiv-aids-living-cases.csv", function(data) {
+
+				//Hand CSV data off to global var, so it's accessible later.
+				dataset = data;
+
+				//Filter data by defined row and columns:
+				var ethnicHIV = convertColumns(data);
+				//console.log(ethnicHIV);
+
+				//Get data from defined row:
+				//var newRow = data.filter(function(d) { return d.DemographicCategory == "RaceEthnicity" });
+				//console.log(newRow);
+
+				//next create headers into an array that can be passed to a newRow function as well as DemographicCategory array and pas header and ro to the same function
+
+				widthScale.domain([ 0, d3.max(ethnicHIV, function(d) {
+					return +d.HIVCount;
+				}) ]);
+
+				//heightScale.domain(d3.range(ethnicHIV.length));
+				//Set yAxis labels from data
+				heightScale.domain(ethnicHIV.map(function(d) { return d.DemographicType; } ));
+				
+				
+				//Scale() grabs the equal and opposite value from the range by input from domain
+
+				ethnicHIV.sort(function(a, b) {
+					return d3.descending(+a.HIVCount, +b.HIVCount);
+
+					//If your numeric values aren't sorting properly,
+					//try commenting out the line above, and instead using:
+					//
+					//return d3.descending(+a.lifeSatisfaction, +b.lifeSatisfaction);
+					//
+					//Data coming in from the CSV is saved as strings (text),
+					//so the + signs here force JavaScript to treat those
+					//strings instead as numeric values, thereby fixing the
+					//sort order (hopefully!).
+				});
+
+
+				var rects = svg.selectAll("rect")
+								.data(ethnicHIV)
+								.enter()
+								.append("rect");
+
+				rects.attr("x", padding[3])
+					.attr("y", function(d, i) {
+						//set y axis dynamically based on data 
+						//return i * heightScale.rangeBand(); // use with rangeBand()
+						//return heightScale(i); // use with rangeRoundBands()
+						return heightScale(d.DemographicType); //Use with labels
+					})
+					.attr("width", function(d) {
+						return widthScale(d.HIVCount);
+					})
+					//set component height dynamically based on data
+					.attr("height", heightScale.rangeBand())
+					.append("title")
+					.text(function(d) {
+						return d.DemographicType + " 2012 HIV Living Cases: " + d.HIVCount;
+					});
+
+				//Set xAxis:
+				svg.append("g")
+					.attr("class", "x axis")
+					.attr("transform", "translate(" + padding[3] + "," + (h - padding[2]) + ")")
+					.call(xAxis);
+
+				//Set yAxis:
+				svg.append("g")
+					.attr("class", "y axis")
+					.attr("transform", "translate(" + (padding[3] -10) + ",0)")
+					.call(yAxis);
+			});
+
+		</script>
+	</body>
+</html>
